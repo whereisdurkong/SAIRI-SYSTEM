@@ -1,0 +1,10 @@
+{
+  "watch": ["bin", "routes", "app.js"],
+  "ignore": [
+    "Attachments/**",
+    "TreatmentProvided/**",
+    "ProofAttachment/**",
+    "node_modules/**"
+  ],
+  "ext": "js,json"
+}

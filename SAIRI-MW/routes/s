@@ -1,0 +1,2287 @@
+
+
+var express = require('express');
+var bcrypt = require('bcrypt');
+const router = express.Router();
+var Sequelize = require('sequelize');
+const { DataTypes } = Sequelize;
+require('dotenv').config();
+
+const multer = require('multer');
+const path = require('path');
+const fs = require('fs');
+
+var knex = require("knex")({
+    client: 'mssql',
+    connection: {
+        user: process.env.USER,
+        password: process.env.PASSWORD,
+        server: process.env.SERVER,
+        database: process.env.DATABASE,
+        port: parseInt(process.env.APP_SERVER_PORT),
+        options: {
+            enableArithAbort: true,
+
+        }
+    },
+});
+
+var db = new Sequelize(process.env.DATABASE, process.env.USER, process.env.PASSWORD, {
+    host: process.env.SERVER,
+    dialect: "mssql",
+    port: parseInt(process.env.APP_SERVER_PORT),
+});
+
+
+const ACCIDENT = db.define('accident_master', {
+    id_master: {
+        type: DataTypes.INTEGER,
+        primaryKey: true
+    },
+    accident_id: {
+        type: DataTypes.STRING
+    },
+    is_active: {
+        type: DataTypes.STRING
+    },
+    ac_status: {
+        type: DataTypes.STRING
+    },
+    created_by: {
+        type: DataTypes.STRING
+    },
+    created_at: {
+        type: DataTypes.STRING
+    },
+    updated_by: {
+        type: DataTypes.STRING
+    },
+    updated_at: {
+        type: DataTypes.STRING
+    },
+    is_active: {
+        type: DataTypes.STRING
+    },
+}, {
+    freezeTableName: false,
+    timestamps: false,
+    createdAt: false,
+    updatedAt: false,
+    tableName: 'accident_master'
+});
+
+const SECTION1 = db.define('accident_section_one_master', {
+    id_master: {
+        type: DataTypes.INTEGER,
+        primaryKey: true
+    },
+    accident_id: {
+        type: DataTypes.STRING
+    },
+    is_active: {
+        type: DataTypes.STRING
+    },
+    data_for: {
+        type: DataTypes.STRING
+    },
+    goverment_notification_required: {
+        type: DataTypes.STRING
+    },
+    accident_incident_subtype: {
+        type: DataTypes.STRING
+    },
+    employer: {
+        type: DataTypes.STRING
+    },
+    name: {
+        type: DataTypes.STRING
+    },
+    chapa_number: {
+        type: DataTypes.STRING
+    },
+    job_designation: {
+        type: DataTypes.STRING
+    },
+    date_of_event: {
+        type: DataTypes.STRING
+    },
+
+    time_of_event: {
+        type: DataTypes.STRING
+    },
+    shift: {
+        type: DataTypes.STRING
+    },
+
+    date_reported: {
+        type: DataTypes.STRING
+    },
+    time_reported: {
+        type: DataTypes.STRING
+    },
+
+    location: {
+        type: DataTypes.STRING
+    },
+
+    specific_location: {
+        type: DataTypes.STRING
+    },
+    level: {
+        type: DataTypes.STRING
+    },
+
+    reported_by: {
+        type: DataTypes.STRING
+    },
+    supervisor_reported_to: {
+        type: DataTypes.STRING
+    },
+    group: {
+        type: DataTypes.STRING
+    },
+    department: {
+        type: DataTypes.STRING
+    },
+    section: {
+        type: DataTypes.STRING
+    },
+    date_hired: {
+        type: DataTypes.STRING
+    },
+    date_of_birth: {
+        type: DataTypes.STRING
+    },
+    age: {
+        type: DataTypes.STRING
+    },
+    home_address: {
+        type: DataTypes.STRING
+    },
+
+    status: {
+        type: DataTypes.STRING
+    },
+    number_of_dependents: {
+        type: DataTypes.STRING
+    },
+
+    length_of_service: {
+        type: DataTypes.STRING
+    },
+
+    expereince_at_occupation: {
+        type: DataTypes.STRING
+    },
+
+    working_area: {
+        type: DataTypes.STRING
+    },
+    incident_accident_brief_description: {
+        type: DataTypes.STRING
+    },
+    immediate_actions_taken: {
+        type: DataTypes.STRING
+    },
+    participants: {
+        type: DataTypes.STRING
+    },
+    prepared_by: {
+        type: DataTypes.STRING
+    },
+    date_and_time: {
+        type: DataTypes.STRING
+    },
+    created_by: {
+        type: DataTypes.STRING
+    },
+    created_at: {
+        type: DataTypes.STRING
+    },
+    updated_by: {
+        type: DataTypes.STRING
+    },
+    updated_at: {
+        type: DataTypes.STRING
+    },
+
+}, {
+    freezeTableName: false,
+    timestamps: false,
+    createdAt: false,
+    updatedAt: false,
+    tableName: 'accident_section_one_master'
+});
+
+
+//Unique ID Generation
+
+function generateAccidentId() {
+    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+    let randomPart = '';
+    for (let i = 0; i < 6; i++) {
+        randomPart += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    return `acc${randomPart}`;
+}
+
+function generateAccidentId(siriRefType, existingIds) {
+    // Determine prefix based on siriRefType
+    let prefix;
+    if (siriRefType === 'Underground') {
+        prefix = 'SUG-AIRI-';
+    } else if (siriRefType === 'Surface') {
+        prefix = 'SSF-AIRI-';
+    } else {
+        // Default fallback
+        prefix = 'ACC-';
+    }
+
+    // Get all existing IDs with the same prefix
+    const existingNumbers = existingIds
+        .filter(id => id.startsWith(prefix))
+        .map(id => {
+            const numberPart = id.replace(prefix, '');
+            return parseInt(numberPart, 10);
+        })
+        .filter(num => !isNaN(num));
+
+    // Find the next available number
+    let nextNumber = 1;
+    if (existingNumbers.length > 0) {
+        const sortedNumbers = existingNumbers.sort((a, b) => a - b);
+        // Find the first gap in the sequence
+        for (let i = 0; i < sortedNumbers.length; i++) {
+            if (sortedNumbers[i] !== i + 1) {
+                nextNumber = i + 1;
+                break;
+            }
+            nextNumber = sortedNumbers.length + 1;
+        }
+    }
+    return `${prefix}${nextNumber}`;
+}
+
+const uploadProofAttachment = multer({
+    storage: multer.diskStorage({
+        destination: (req, file, cb) => {
+            cb(null, os.tmpdir());
+        },
+        filename: (req, file, cb) => {
+            const now = new Date();
+            const pad = (n) => String(n).padStart(2, '0');
+            const datePart = `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}`;
+            const timePart = `${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`;
+            const rand = String(Math.floor(Math.random() * 90) + 10);
+            const ext = path.extname(file.originalname);
+            cb(null, `pf${datePart}${timePart}${rand}${ext}`);
+        },
+    }),
+    limits: { fileSize: 20 * 1024 * 1024 },
+    fileFilter: (req, file, cb) => {
+        const allowed = [
+            'application/pdf',
+            'application/msword',
+            'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+            'application/vnd.ms-excel',
+            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            'image/jpeg', 'image/png', 'image/gif', 'image/webp',
+        ];
+        if (allowed.includes(file.mimetype)) cb(null, true);
+        else cb(new Error('Invalid file type.'));
+    },
+});
+
+router.post('/upload-proof-attachment-file', uploadProofAttachment.single('file'), async (req, res) => {
+    try {
+        const { accident_id, uploaded_by } = req.body;
+
+        if (!req.file) return res.status(400).json({ error: 'No file uploaded.' });
+        if (!accident_id) return res.status(400).json({ error: 'accident_id is required.' });
+
+        const targetDir = path.join(__dirname, '../ProofAttachment', accident_id);
+        fs.mkdirSync(targetDir, { recursive: true });
+
+        const targetPath = path.join(targetDir, req.file.filename);
+        fs.renameSync(req.file.path, targetPath);
+
+        const filePath = `ProofAttachment/${accident_id}/${req.file.filename}`;
+
+        const newFile = {
+            file_name: req.file.filename,
+            original_name: req.file.originalname,
+            file_path: filePath,
+            uploaded_at: new Date().toISOString(),
+        };
+
+        const changes_made = `${uploaded_by || 'System'} attached proof of completion: "${req.file.originalname}"`;
+        try {
+            // await knex('accident_section_logs_master').insert({
+            //     accident_id,
+            //     changes_made,
+            //     section: 'section_eight',
+            //     created_by: uploaded_by || 'System',
+            //     created_at: new Date(),
+            // });
+        } catch (logErr) {
+            console.log('UNABLE TO LOG PROOF ATTACHMENT UPLOAD:', logErr);
+        }
+
+        res.status(200).json({ message: 'Proof attachment uploaded successfully.', file: newFile });
+    } catch (err) {
+        if (req.file?.path && fs.existsSync(req.file.path)) fs.unlinkSync(req.file.path);
+        console.log('UNABLE TO UPLOAD PROOF ATTACHMENT:', err);
+        res.status(500).json({ error: 'Failed to upload proof attachment.', details: err.message });
+    }
+});
+
+router.delete('/delete-proof-attachment-file', async (req, res) => {
+    try {
+        const { accident_id, file_name, deleted_by } = req.body;
+
+        const targetPath = path.join(__dirname, '../ProofAttachment', accident_id, file_name);
+        if (fs.existsSync(targetPath)) fs.unlinkSync(targetPath);
+
+        // const changes_made = `${deleted_by || 'System'} removed proof of completion: "${file_name}"`;
+        try {
+            // await knex('accident_section_logs_master').insert({
+            //     accident_id,
+            //     changes_made,
+            //     section: 'section_eight',
+            //     created_by: deleted_by || 'System',
+            //     created_at: new Date(),
+            // });
+        } catch (logErr) {
+            console.log('UNABLE TO LOG PROOF ATTACHMENT DELETE:', logErr);
+        }
+
+        res.status(200).json({ message: 'Proof attachment deleted successfully.' });
+    } catch (err) {
+        console.log('UNABLE TO DELETE PROOF ATTACHMENT:', err);
+        res.status(500).json({ error: 'Failed to delete proof attachment.', details: err.message });
+    }
+});
+
+router.get('/proof-attachment-file/:filename', async (req, res) => {
+    try {
+        const { filename } = req.params;
+        const baseDir = path.join(__dirname, '../ProofAttachment');
+
+        if (!fs.existsSync(baseDir)) {
+            return res.status(404).json({ error: 'No proof attachments directory found.' });
+        }
+
+        const subDirs = fs.readdirSync(baseDir, { withFileTypes: true })
+            .filter(d => d.isDirectory())
+            .map(d => d.name);
+
+        let filePath = null;
+        for (const dir of subDirs) {
+            const candidate = path.join(baseDir, dir, filename);
+            if (fs.existsSync(candidate)) {
+                filePath = candidate;
+                break;
+            }
+        }
+
+        if (!filePath) return res.status(404).json({ error: 'File not found.' });
+
+        const resolvedPath = path.resolve(filePath);
+        const resolvedBase = path.resolve(baseDir);
+        if (!resolvedPath.startsWith(resolvedBase + path.sep)) {
+            return res.status(403).json({ error: 'Access denied.' });
+        }
+
+        res.sendFile(resolvedPath);
+    } catch (err) {
+        console.log('UNABLE TO SERVE PROOF ATTACHMENT FILE:', err);
+        res.status(500).json({ error: 'Failed to serve file.', details: err.message });
+    }
+});
+
+// ── CHANGE-LOG HELPERS ──────────────────────────────────────────────────────
+// Normalises a raw DB/payload value into a comparable, printable string.
+function normaliseValue(v) {
+    if (v === null || v === undefined) return '';
+    if (v instanceof Date) {
+        if (v.getUTCFullYear() === 1970 && v.getUTCMonth() === 0 && v.getUTCDate() === 1) {
+            const hh = String(v.getUTCHours()).padStart(2, '0');
+            const mm = String(v.getUTCMinutes()).padStart(2, '0');
+            return `${hh}:${mm}`;
+        }
+        return v.toISOString().slice(0, 10);
+    }
+    const s = String(v).trim();
+    const sLower = s.toLowerCase();
+    if (['1', 'true', 'yes'].includes(sLower)) return '1';
+    if (['0', 'false', 'no'].includes(sLower)) return '0';
+    const isoDateOnly = s.match(/^(\d{4}-\d{2}-\d{2})[T ]/i);
+    if (isoDateOnly) return isoDateOnly[1];
+    const epochTime = s.match(/^1970-01-01[T ](\d{2}):(\d{2})/i);
+    if (epochTime) return `${epochTime[1]}:${epochTime[2]}`;
+    const timeMatch = s.match(/^(\d{2}):(\d{2}):\d{2}$/);
+    if (timeMatch) return `${timeMatch[1]}:${timeMatch[2]}`;
+    return sLower;
+}
+
+const JSON_ARRAY_OR_OBJECT_FIELDS = new Set(['other_attachements', 'corrective_table']);
+const isEmptyJsonString = (v) => v === '' || v === '[]' || v === '{}' || v === 'null';
+
+function buildSectionEightChangeLog({ user, isCreate, accident_id, fieldLabels, existing, newPayload }) {
+    const entries = [];
+
+    for (const [col, label] of Object.entries(fieldLabels)) {
+        if (col === 'corrective_table') {
+            let oldArr = [];
+            let newArr = [];
+            try { oldArr = existing?.[col] ? JSON.parse(existing[col]) : []; } catch { oldArr = []; }
+            try { newArr = newPayload[col] ? JSON.parse(newPayload[col]) : []; } catch { newArr = []; }
+
+            const itemLabel = (it, idx) => it?.recommendation
+                ? `#${idx + 1} `
+                : `#${idx + 1}`;
+
+            const diffAttachments = (oldAtt = [], newAtt = []) => {
+                const oldNames = new Set(oldAtt.map(a => a.original_name || a.file_name));
+                const newNames = new Set(newAtt.map(a => a.original_name || a.file_name));
+                const added = newAtt.filter(a => !oldNames.has(a.original_name || a.file_name));
+                const removed = oldAtt.filter(a => !newNames.has(a.original_name || a.file_name));
+                const parts = [];
+                if (added.length) parts.push(`added ${added.map(a => `"${a.original_name}"`).join(', ')}`);
+                if (removed.length) parts.push(`removed ${removed.map(a => `"${a.original_name}"`).join(', ')}`);
+                return parts.join('; ');
+            };
+
+            const maxLen = Math.max(oldArr.length, newArr.length);
+            const itemFieldLabels = {
+                recommendation: 'Recommendation',
+                responsible_department: 'Responsible Department',
+                responsible_person: 'Responsible Person',
+                due_date: 'Due Date',
+                completion_responsible_person: 'Completion Responsible Person',
+                dept_head: 'Dept Head',
+                status: 'Status',
+            };
+
+            for (let i = 0; i < maxLen; i++) {
+                const oldIt = oldArr[i];
+                const newIt = newArr[i];
+
+                if (oldIt && !newIt) {
+                    entries.push(`${user} removed Corrective Action Item ${itemLabel(oldIt, i)}`);
+                    continue;
+                }
+                if (!oldIt && newIt) {
+                    entries.push(`${user} added Corrective Action Item ${itemLabel(newIt, i)}`);
+                    continue;
+                }
+                if (!oldIt && !newIt) continue;
+
+                const itemChanges = [];
+                for (const [fkey, flabel] of Object.entries(itemFieldLabels)) {
+                    const ov = normaliseValue(oldIt[fkey]);
+                    const nv = normaliseValue(newIt[fkey]);
+                    if (ov !== nv) itemChanges.push(`${flabel}: "${ov || 'empty'}" → "${nv || 'empty'}"`);
+                }
+
+                const attDiff = diffAttachments(oldIt.proof_attachments, newIt.proof_attachments);
+
+                const otherFieldChanges = itemChanges; // recommendation/dept/etc. diffs collected above
+                if (otherFieldChanges.length > 0) {
+                    entries.push(`${user} updated Corrective Action Item ${itemLabel(newIt, i)} — ${otherFieldChanges.join('; ')}`);
+                }
+                if (attDiff) {
+                    entries.push(`${user} updated Proof Attachments on Corrective Action Item ${itemLabel(newIt, i)} — ${attDiff}`);
+                }
+            }
+
+            continue;
+        }
+
+        // Other fields: normal empty-aware diff
+        let oldVal = existing ? normaliseValue(existing[col]) : '';
+        let newVal = normaliseValue(newPayload[col]);
+        if (JSON_ARRAY_OR_OBJECT_FIELDS.has(col)) {
+            if (isEmptyJsonString(oldVal)) oldVal = '';
+            if (isEmptyJsonString(newVal)) newVal = '';
+        }
+        if (oldVal === newVal) continue;
+
+        entries.push(isCreate
+            ? `${user} created and change ${label}: from "${oldVal || 'empty'}" to "${newVal || 'empty'}"`
+            : `${user} updated and change ${label}: from "${oldVal || 'empty'}" to "${newVal || 'empty'}"`
+        );
+    }
+
+    if (entries.length === 0) {
+        return isCreate
+            ? `${user} created Section 8 for AIRI number: ${accident_id} with no fields filled.`
+            : `${user} updated Section 8 for ${accident_id} with no detected field changes.`;
+    }
+
+    return entries.join('\n');
+}
+
+function buildChangeLog({ user, isCreate, fieldLabels, existing, newPayload, onlyFilledOnCreate = true }) {
+    const verb = isCreate ? 'created' : 'updated';
+    const lines = [];
+
+    for (const [col, label] of Object.entries(fieldLabels)) {
+        let oldVal = existing ? normaliseValue(existing[col]) : '';
+        let newVal = normaliseValue(newPayload[col]);
+
+        if (JSON_ARRAY_OR_OBJECT_FIELDS.has(col)) {
+            if (isEmptyJsonString(oldVal)) oldVal = '';
+            if (isEmptyJsonString(newVal)) newVal = '';
+        }
+
+        if (isCreate) {
+            if (onlyFilledOnCreate && newVal === '') continue;
+
+            // Special case: recurrent_injury_illness stores 1/0, show as Yes/No in logs
+            if (col === 'recurrent_injury_illness') {
+                const toYesNo = (v) => (v === '1' ? 'Yes' : v === '0' ? 'No' : (v || 'empty'));
+                lines.push(`${user} ${verb} and change ${label}: from "${toYesNo(oldVal)}" to "${toYesNo(newVal)}"`);
+                continue;
+            }
+
+            lines.push(`${user} ${verb} and change ${label}: from "${oldVal || 'empty'}" to "${newVal || 'empty'}"`);
+        } else {
+            if (oldVal === newVal) continue;
+
+            // Special case: recurrent_injury_illness stores 1/0, show as Yes/No in logs
+            if (col === 'recurrent_injury_illness') {
+                const toYesNo = (v) => (v === '1' ? 'Yes' : v === '0' ? 'No' : (v || 'empty'));
+                lines.push(`${user} ${verb} and change ${label}: from "${toYesNo(oldVal)}" to "${toYesNo(newVal)}"`);
+                continue;
+            }
+
+            lines.push(`${user} ${verb} and change ${label}: from "${oldVal || 'empty'}" to "${newVal || 'empty'}"`);
+        }
+    }
+
+    if (lines.length === 0) {
+        return null; // signal: nothing changed, skip logging
+    }
+
+    return lines.join('\n');
+}
+
+const parseTimeForSQL = (val) => {
+    if (!val) return null;
+    if (/^\d{2}:\d{2}$/.test(val)) return `${val}:00`;
+    if (/^\d{2}:\d{2}:\d{2}/.test(val)) return val;
+    return null;
+};
+
+function getFileType(filename) {
+    if (!filename) return 'unknown';
+    const ext = path.extname(filename).toLowerCase();
+    const typeMap = {
+        '.pdf': 'PDF',
+        '.doc': 'Word Document',
+        '.docx': 'Word Document',
+        '.xls': 'Excel Spreadsheet',
+        '.xlsx': 'Excel Spreadsheet',
+        '.jpg': 'Image',
+        '.jpeg': 'Image',
+        '.png': 'Image',
+        '.gif': 'Image',
+        '.webp': 'Image'
+    };
+    return typeMap[ext] || 'File';
+}
+
+const os = require('os');
+
+const uploadTreatment = multer({
+    storage: multer.diskStorage({
+        destination: (req, file, cb) => {
+            // Use OS temp dir — accident_id not yet available here
+            cb(null, os.tmpdir());
+        },
+        filename: (req, file, cb) => {
+            const now = new Date();
+            const pad = (n) => String(n).padStart(2, '0');
+            const datePart = `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}`;
+            const timePart = `${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`;
+            const rand = String(Math.floor(Math.random() * 90) + 10);
+            const ext = path.extname(file.originalname);
+            cb(null, `tp${datePart}${timePart}${rand}${ext}`);
+        },
+    }),
+    limits: { fileSize: 20 * 1024 * 1024 },
+    fileFilter: (req, file, cb) => {
+        const allowed = [
+            'application/pdf',
+            'application/msword',
+            'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+            'application/vnd.ms-excel',
+            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            'image/jpeg', 'image/png', 'image/gif', 'image/webp',
+        ];
+        if (allowed.includes(file.mimetype)) cb(null, true);
+        else cb(new Error('Invalid file type. Only PDF, Word, Excel, and images are allowed.'));
+    },
+});
+
+const uploadAttachment = multer({
+    storage: multer.diskStorage({
+        destination: (req, file, cb) => {
+            cb(null, os.tmpdir());
+        },
+        filename: (req, file, cb) => {
+            const now = new Date();
+            const pad = (n) => String(n).padStart(2, '0');
+            const datePart = `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}`;
+            const timePart = `${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`;
+            const rand = String(Math.floor(Math.random() * 90) + 10);
+            const ext = path.extname(file.originalname);
+            cb(null, `att${datePart}${timePart}${rand}${ext}`);
+        },
+    }),
+    limits: { fileSize: 20 * 1024 * 1024 },
+    fileFilter: (req, file, cb) => {
+        const allowed = [
+            'application/pdf',
+            'application/msword',
+            'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+            'application/vnd.ms-excel',
+            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            'image/jpeg', 'image/png', 'image/gif', 'image/webp',
+        ];
+        if (allowed.includes(file.mimetype)) cb(null, true);
+        else cb(new Error('Invalid file type.'));
+    },
+});
+
+router.post('/upload-attachment-file', uploadAttachment.single('file'), async (req, res) => {
+    try {
+        const { accident_id, uploaded_by } = req.body;
+
+        if (!req.file) return res.status(400).json({ error: 'No file uploaded.' });
+        if (!accident_id) return res.status(400).json({ error: 'accident_id is required.' });
+
+        const targetDir = path.join(__dirname, '../Attachments', accident_id);
+        fs.mkdirSync(targetDir, { recursive: true });
+
+        const targetPath = path.join(targetDir, req.file.filename);
+        fs.renameSync(req.file.path, targetPath);
+
+        const filePath = `Attachments/${accident_id}/${req.file.filename}`;
+
+        const existing = await knex('accident_section_eight_master')
+            .where('accident_id', accident_id)
+            .first();
+
+        let currentAttachments = [];
+        try {
+            if (existing?.other_attachements) {
+                currentAttachments = JSON.parse(existing.other_attachements);
+            }
+        } catch { currentAttachments = []; }
+
+        const newFile = {
+            file_name: req.file.filename,
+            original_name: req.file.originalname,
+            file_path: filePath,
+            uploaded_at: new Date().toISOString(),
+        };
+
+        currentAttachments.push(newFile);
+
+        const fileType = getFileType(req.file.originalname);
+        const changes_made = `${uploaded_by || 'System'} attached file: "${req.file.originalname}"`;
+        await knex.transaction(async (trx) => {
+            if (existing) {
+                await trx('accident_section_eight_master')
+                    .where('accident_id', accident_id)
+                    .update({
+                        other_attachements: JSON.stringify(currentAttachments),
+                        updated_by: uploaded_by,
+                        updated_at: new Date(),
+                    });
+            } else {
+                await trx('accident_section_eight_master').insert({
+                    accident_id,
+                    other_attachements: JSON.stringify(currentAttachments),
+                    created_by: uploaded_by,
+                    created_at: new Date(),
+                });
+            }
+
+            await trx('accident_section_logs_master').insert({
+                accident_id,
+                changes_made,
+                section: 'section_eight',
+                created_by: uploaded_by || 'System',
+                created_at: new Date(),
+            });
+        });
+
+        res.status(200).json({ message: 'Attachment uploaded successfully.', file: newFile });
+    } catch (err) {
+        if (req.file?.path && fs.existsSync(req.file.path)) fs.unlinkSync(req.file.path);
+        console.log('UNABLE TO UPLOAD ATTACHMENT:', err);
+        res.status(500).json({ error: 'Failed to upload attachment.', details: err.message });
+    }
+});
+
+router.delete('/delete-attachment-file', async (req, res) => {
+    try {
+        const { accident_id, file_name, deleted_by } = req.body;
+
+        const existing = await knex('accident_section_eight_master')
+            .where('accident_id', accident_id)
+            .first();
+
+        let currentAttachments = [];
+        let removedFile = null;
+
+        try {
+            if (existing?.other_attachements) {
+                currentAttachments = JSON.parse(existing.other_attachements);
+                removedFile = currentAttachments.find(f => f.file_name === file_name);
+            }
+        } catch { currentAttachments = []; }
+
+        if (removedFile) {
+            const absPath = path.join(__dirname, '..', removedFile.file_path);
+            if (fs.existsSync(absPath)) fs.unlinkSync(absPath);
+        }
+
+        const updatedAttachments = currentAttachments.filter(f => f.file_name !== file_name);
+
+        const fileType = getFileType(removedFile?.original_name || file_name);
+        const changes_made = `${deleted_by || 'System'} removed file: "${removedFile?.original_name || file_name}"`;
+        await knex.transaction(async (trx) => {
+            await trx('accident_section_eight_master')
+                .where('accident_id', accident_id)
+                .update({
+                    other_attachements: JSON.stringify(updatedAttachments),
+                    updated_by: deleted_by,
+                    updated_at: new Date(),
+                });
+
+            await trx('accident_section_logs_master').insert({
+                accident_id,
+                changes_made,
+                section: 'section_eight',
+                created_by: deleted_by || 'System',
+                created_at: new Date(),
+            });
+        });
+
+        res.status(200).json({ message: 'Attachment deleted successfully.' });
+    } catch (err) {
+        console.log('UNABLE TO DELETE ATTACHMENT:', err);
+        res.status(500).json({ error: 'Failed to delete attachment.', details: err.message });
+    }
+});
+
+// Serve attachment files
+router.get('/attachment-file/:filename', async (req, res) => {
+    try {
+        const { filename } = req.params;
+        const baseDir = path.join(__dirname, '../Attachments');
+
+        if (!fs.existsSync(baseDir)) {
+            return res.status(404).json({ error: 'No attachments directory found.' });
+        }
+
+        const subDirs = fs.readdirSync(baseDir, { withFileTypes: true })
+            .filter(d => d.isDirectory())
+            .map(d => d.name);
+
+        let filePath = null;
+        for (const dir of subDirs) {
+            const candidate = path.join(baseDir, dir, filename);
+            if (fs.existsSync(candidate)) {
+                filePath = candidate;
+                break;
+            }
+        }
+
+        if (!filePath) return res.status(404).json({ error: 'File not found.' });
+
+        const resolvedPath = path.resolve(filePath);
+        const resolvedBase = path.resolve(baseDir);
+        if (!resolvedPath.startsWith(resolvedBase + path.sep)) {
+            return res.status(403).json({ error: 'Access denied.' });
+        }
+
+        res.sendFile(resolvedPath);
+    } catch (err) {
+        console.log('UNABLE TO SERVE ATTACHMENT FILE:', err);
+        res.status(500).json({ error: 'Failed to serve file.', details: err.message });
+    }
+});
+
+// ── SECTION 1 SPECIFIC CHANGE-LOG FORMAT ────────────────────────────────────
+function buildSectionOneChangeLog({ user, isCreate, accident_id, fieldLabels, existing, newPayload }) {
+    if (isCreate) {
+        return `${user} created ${accident_id}`;
+    }
+
+    const entries = [];
+    for (const [col, label] of Object.entries(fieldLabels)) {
+        const oldVal = existing ? normaliseValue(existing[col]) : '';
+        const newVal = normaliseValue(newPayload[col]);
+
+        if (oldVal === newVal) continue;
+
+        if (col === 'goverment_notification_required') {
+            const toYesNo = (v) => (v === '1' ? 'Yes' : v === '0' ? 'No' : (v || 'empty'));
+            entries.push(`${user} updated ${label} from ${toYesNo(oldVal)} to ${toYesNo(newVal)}`);
+            continue;
+        }
+
+        if (col === 'participants') {
+            let oldArr = [];
+            let newArr = [];
+            try { oldArr = existing?.[col] ? JSON.parse(existing[col]) : []; } catch { oldArr = []; }
+            try { newArr = newPayload[col] ? JSON.parse(newPayload[col]) : []; } catch { newArr = []; }
+
+            const stringifyP = (p) => JSON.stringify({
+                name: p.name || '',
+                department: p.department || '',
+                involvementType: p.involvementType || ''
+            });
+
+            const oldSet = new Set(oldArr.map(stringifyP));
+            const newSet = new Set(newArr.map(stringifyP));
+
+            const added = newArr.filter(p => !oldSet.has(stringifyP(p)));
+            const removed = oldArr.filter(p => !newSet.has(stringifyP(p)));
+
+            if (added.length > 0 && removed.length > 0 && added.length === removed.length) {
+                // Same number added and removed = treat as edit(s), pair them up
+                for (let i = 0; i < added.length; i++) {
+                    entries.push(`${user} updated participants from ${JSON.stringify([removed[i]])} to ${JSON.stringify([added[i]])}`);
+                }
+            } else {
+                if (added.length > 0) {
+                    entries.push(`${user} updated participants added ${JSON.stringify(added)}`);
+                }
+                if (removed.length > 0) {
+                    entries.push(`${user} updated participants removed ${JSON.stringify(removed)}`);
+                }
+            }
+
+            if (added.length === 0 && removed.length === 0 && oldVal !== newVal) {
+                entries.push(`${user} updated participants`);
+            }
+            continue;
+        }
+
+        entries.push(`${user} updated ${label} from ${oldVal || 'empty'} to ${newVal || 'empty'}`);
+    }
+    if (entries.length === 0) {
+        return `${user} updated ${accident_id} with no detected field changes`;
+    }
+
+    // Wrap as {"entry1","entry2",...}
+    const quoted = entries.map(e => `"${e.replace(/"/g, '\\"')}"`).join(',');
+    return `{${quoted}}`;
+}
+
+router.post('/add-report', async (req, res) => {
+    try {
+        const currentTimestamp = new Date();
+        const {
+            siriRefType,
+            dataFor,
+            govtNotification,
+            subtypes,
+            employer,
+            name,
+            chapaNo,
+            jobDesignation,
+            dateOfEvent,
+            timeOfEvent,
+            shift,
+            dateReported,
+            timeReported,
+            location,
+            specificLocation,
+            level,
+            reportedBy,
+            reportedTo,
+            group,
+            department,
+            section,
+            dateHired,
+            dateOfBirth,
+            age,
+            homeAddress,
+            status,
+            noOfDependents,
+            lengthOfService,
+            experienceAtOccupation,
+            workingAreas,
+            othersArea,
+            incidentDescription,
+            immediateActions,
+            participants,
+            preparedBy,
+            preparedDateTime,
+            created_by
+        } = req.body;
+
+        // Get all existing IDs from the database
+        const existingIds = await knex('accident_master').pluck('accident_id');
+
+        // Generate a unique ID based on siriRefType
+        const accident_id = generateAccidentId(siriRefType, existingIds);
+
+        // Format participants for storage - store as JSON string
+        // Filter out empty participants (all fields empty)
+        const filteredParticipants = participants.filter(p =>
+            p.name?.trim() || p.department?.trim() || p.involvementType?.trim()
+        );
+
+        // Transform participants to store only name, department, involvementType
+        const formattedParticipants = filteredParticipants.map(p => ({
+            name: p.name || '',
+            department: p.department || '',
+            involvementType: p.involvementType || ''
+        }));
+
+        const newPayload = {
+            goverment_notification_required: govtNotification === 'YES' ? 1 : 0,
+            data_for: dataFor,
+            accident_incident_subtype: subtypes,
+            employer,
+            name,
+            chapa_number: chapaNo,
+            job_designation: jobDesignation,
+            date_of_event: dateOfEvent,
+            time_of_event: timeOfEvent,
+            shift,
+            date_reported: dateReported,
+            time_reported: timeReported,
+            location,
+            specific_location: specificLocation,
+            level,
+            reported_by: reportedBy,
+            supervisor_reported_to: reportedTo,
+            group,
+            department,
+            section,
+            date_hired: dateHired,
+            date_of_birth: dateOfBirth,
+            age,
+            home_address: homeAddress,
+            status,
+            number_of_dependents: noOfDependents,
+            length_of_service: lengthOfService,
+            expereince_at_occupation: experienceAtOccupation,
+            working_area: workingAreas,
+            incident_accident_brief_description: incidentDescription,
+            immediate_actions_taken: immediateActions,
+            participants: JSON.stringify(formattedParticipants),
+            prepared_by: preparedBy,
+            date_and_time: preparedDateTime,
+        };
+
+        const fieldLabels = {
+            goverment_notification_required: 'Government Notification Required',
+            data_for: 'Data For',
+            accident_incident_subtype: 'Accident/Incident Subtype',
+            employer: 'Employer',
+            name: 'Name',
+            chapa_number: 'Chapa No.',
+            job_designation: 'Job Designation',
+            date_of_event: 'Date of Event',
+            time_of_event: 'Time of Event',
+            shift: 'Shift',
+            date_reported: 'Date Reported',
+            time_reported: 'Time Reported',
+            location: 'Location',
+            specific_location: 'Specific Location',
+            level: 'Level',
+            reported_by: 'Reported By',
+            supervisor_reported_to: 'Supervisor Reported To',
+            group: 'Group',
+            department: 'Department',
+            section: 'Section',
+            date_hired: 'Date Hired',
+            date_of_birth: 'Date of Birth',
+            age: 'Age',
+            home_address: 'Home Address',
+            status: 'Status',
+            number_of_dependents: 'No. of Dependents',
+            length_of_service: 'Length of Service',
+            expereince_at_occupation: 'Experience at Occupation',
+            working_area: 'Working Area',
+            incident_accident_brief_description: 'Incident/Accident Brief Description',
+            immediate_actions_taken: 'Immediate Actions Taken',
+            participants: 'Participants',
+            prepared_by: 'Prepared By',
+            date_and_time: 'Date & Time',
+        };
+
+        const changes_made = buildSectionOneChangeLog({
+            user: created_by,
+            isCreate: true,
+            accident_id,
+            fieldLabels,
+            existing: null,
+            newPayload,
+        });
+
+        // Start a transaction to ensure data consistency
+        await knex.transaction(async (trx) => {
+            await trx('accident_master').insert({
+                accident_id,
+                is_active: true,
+                created_by: created_by,
+                created_at: currentTimestamp,
+                ac_status: 'open'
+            });
+
+            await trx('accident_section_one_master').insert({
+                accident_id,
+                is_active: true,
+                ...newPayload,
+                created_by: created_by,
+                created_at: currentTimestamp,
+            });
+
+            await trx('accident_section_logs_master').insert({
+                accident_id,
+                changes_made,
+                section: 'section_one',
+                created_by,
+                created_at: currentTimestamp
+            })
+        });
+
+        res.status(200).json({
+            message: 'success',
+            accident_id
+        });
+
+    } catch (err) {
+        console.log('UNABLE TO POST REPORT: ', err);
+        res.status(500).json({
+            error: 'Failed to create accident report',
+            details: err.message
+        });
+    }
+});
+
+
+router.get('/treatment-file/:filename', async (req, res) => {
+    try {
+        const { filename } = req.params;
+
+        // Search for the file across all accident subdirectories
+        const baseDir = path.join(__dirname, '../TreatmentProvided');
+
+        if (!fs.existsSync(baseDir)) {
+            return res.status(404).json({ error: 'No treatment files directory found.' });
+        }
+
+        // Walk accident_id subdirectories to find the file
+        const subDirs = fs.readdirSync(baseDir, { withFileTypes: true })
+            .filter(d => d.isDirectory())
+            .map(d => d.name);
+
+        let filePath = null;
+        for (const dir of subDirs) {
+            const candidate = path.join(baseDir, dir, filename);
+            if (fs.existsSync(candidate)) {
+                filePath = candidate;
+                break;
+            }
+        }
+
+        if (!filePath) {
+            return res.status(404).json({ error: 'File not found.' });
+        }
+
+        // Security check: make sure the resolved path stays inside TreatmentProvided
+        const resolvedPath = path.resolve(filePath);
+        const resolvedBase = path.resolve(baseDir);
+        if (!resolvedPath.startsWith(resolvedBase + path.sep)) {
+            return res.status(403).json({ error: 'Access denied.' });
+        }
+
+        res.sendFile(resolvedPath);
+
+    } catch (err) {
+        console.log('UNABLE TO SERVE TREATMENT FILE:', err);
+        res.status(500).json({ error: 'Failed to serve file.', details: err.message });
+    }
+});
+
+
+router.post('/upload-treatment-file', uploadTreatment.single('file'), async (req, res) => {
+    try {
+        const { accident_id } = req.body;
+        // You need to pass the user who is uploading. Consider adding it to the request body or using a middleware
+        const { uploaded_by } = req.body; // Add this to your request payload
+
+        if (!req.file) return res.status(400).json({ error: 'No file uploaded.' });
+        if (!accident_id) return res.status(400).json({ error: 'accident_id is required.' });
+
+        // ── Move file from temp dir to the correct accident folder ──
+        const targetDir = path.join(__dirname, '../TreatmentProvided', accident_id);
+        fs.mkdirSync(targetDir, { recursive: true });
+
+        const targetPath = path.join(targetDir, req.file.filename);
+        fs.renameSync(req.file.path, targetPath);
+
+        const filePath = `TreatmentProvided/${accident_id}/${req.file.filename}`;
+
+        // ── Fetch existing files from DB ──
+        const existing = await knex('accident_section_three_master')
+            .where('accident_id', accident_id)
+            .first();
+
+        let currentFiles = [];
+        try {
+            if (existing?.files_of_treatment_provided) {
+                currentFiles = JSON.parse(existing.files_of_treatment_provided);
+            }
+        } catch { currentFiles = []; }
+
+        const newFile = {
+            file_name: req.file.filename,
+            original_name: req.file.originalname,
+            file_path: filePath,
+            uploaded_at: new Date().toISOString(),
+        };
+
+        currentFiles.push(newFile);
+
+        // ── Prepare log message ──
+        const fileType = getFileType(req.file.originalname);
+        const changes_made = `${uploaded_by || 'System'} uploaded ${fileType} file: "${req.file.originalname}" (${req.file.filename})`;
+        created_by: uploaded_by || 'System',
+
+            // ── Update DB and log ──
+            await knex.transaction(async (trx) => {
+                if (existing) {
+                    await trx('accident_section_three_master')
+                        .where('accident_id', accident_id)
+                        .update({
+                            files_of_treatment_provided: JSON.stringify(currentFiles),
+                            updated_by: uploaded_by,
+                            updated_at: new Date()
+                        });
+
+                    // await trx('accident_section_logs_master').inserct({
+                    //     accident_id,
+                    //     changes_made: `${uploaded_by}`,
+                    // })
+                } else {
+                    await trx('accident_section_three_master').insert({
+                        accident_id,
+                        files_of_treatment_provided: JSON.stringify(currentFiles),
+                        created_by: uploaded_by,
+                        created_at: new Date(),
+                    });
+                }
+
+                // ── INSERT LOG ENTRY ──
+                await trx('accident_section_logs_master').insert({
+                    accident_id,
+                    changes_made,
+                    section: 'section_three',
+                    created_by: uploaded_by || 'System',
+                    created_at: new Date(),
+                });
+            });
+
+        res.status(200).json({
+            message: 'File uploaded successfully.',
+            file: newFile,
+        });
+    } catch (err) {
+        // Clean up temp file if something went wrong
+        if (req.file?.path && fs.existsSync(req.file.path)) {
+            fs.unlinkSync(req.file.path);
+        }
+        console.log('UNABLE TO UPLOAD TREATMENT FILE:', err);
+        res.status(500).json({ error: 'Failed to upload file.', details: err.message });
+    }
+});
+
+router.delete('/delete-treatment-file', async (req, res) => {
+    try {
+        const { accident_id, file_name, deleted_by } = req.body; // Add deleted_by to the request payload
+
+        const existing = await knex('accident_section_three_master')
+            .where('accident_id', accident_id)
+            .first();
+
+        let currentFiles = [];
+        let removedFile = null;
+
+        try {
+            if (existing?.files_of_treatment_provided) {
+                currentFiles = JSON.parse(existing.files_of_treatment_provided);
+                removedFile = currentFiles.find(f => f.file_name === file_name);
+            }
+        } catch { currentFiles = []; }
+
+        if (removedFile) {
+            const absPath = path.join(__dirname, '..', removedFile.file_path);
+            if (fs.existsSync(absPath)) fs.unlinkSync(absPath);
+        }
+
+        const updatedFiles = currentFiles.filter(f => f.file_name !== file_name);
+
+        // ── Prepare log message ──
+        const fileType = getFileType(removedFile?.original_name || file_name);
+        const changes_made = `${deleted_by || 'System'} removed ${fileType} file: "${removedFile?.original_name || file_name}" (${file_name})`;
+
+        await knex.transaction(async (trx) => {
+            await trx('accident_section_three_master')
+                .where('accident_id', accident_id)
+                .update({
+                    files_of_treatment_provided: JSON.stringify(updatedFiles),
+                    updated_by: deleted_by,
+                    updated_at: new Date()
+                });
+
+            // ── INSERT LOG ENTRY ──
+            await trx('accident_section_logs_master').insert({
+                accident_id,
+                changes_made,
+                section: 'section_three',
+                created_by: deleted_by || 'System',
+                created_at: new Date(),
+            });
+        });
+
+        res.status(200).json({ message: 'File deleted successfully.' });
+    } catch (err) {
+        console.log('UNABLE TO DELETE TREATMENT FILE:', err);
+        res.status(500).json({ error: 'Failed to delete file.', details: err.message });
+    }
+});
+
+
+
+
+
+router.post('/add-section3-report', async (req, res) => {
+    try {
+        const currentTimestamp = new Date();
+        const { accident_id, recurrentInjury, dateTimeProvided, extentOfDisability,
+            natureOfInjury, mechanismOfInjury, mechanismOfInjuryOther, contactExposure,
+            contactExposureOther, agencyOfInjury, agencyOfInjuryOther, partsBodyInjured,
+            partsBodyInjuredOther, medicalDiagnosis, vitals, rehabilitationPlan,
+            rehabLightWorkDays, rehabFurtherEval, detailsOfTreatment, attendingPhysician,
+            dateTime, created_by } = req.body;
+
+        const mechanismFinal = [...mechanismOfInjury, ...(mechanismOfInjuryOther ? [mechanismOfInjuryOther] : [])].join(',');
+        const contactFinal = [...contactExposure, ...(contactExposureOther ? [contactExposureOther] : [])].join(',');
+        const agencyFinal = [...agencyOfInjury, ...(agencyOfInjuryOther ? [agencyOfInjuryOther] : [])].join(',');
+        const bodyPartsFinal = [...partsBodyInjured, ...(partsBodyInjuredOther ? [partsBodyInjuredOther] : [])].join(',');
+        const rehabFinal = [
+            ...rehabilitationPlan,
+            ...(rehabLightWorkDays ? [`Light Work: ${rehabLightWorkDays} days`] : []),
+            ...(rehabFurtherEval ? [`Further Evaluation: ${rehabFurtherEval}`] : [])
+        ].join(',');
+
+        const newPayload = {
+            recurrent_injury_illness: recurrentInjury === 'YES' ? 1 : 0,
+            date_and_time_treatment_provided: dateTimeProvided,
+            extent_of_disability: extentOfDisability.join(','),
+            nature_of_injury: natureOfInjury.join(','),
+            mechanism_of_injury: mechanismFinal,
+            contact_with_or_exposure_to: contactFinal,
+            agency_of_injury: agencyFinal,
+            parts_of_the_body_injured: bodyPartsFinal,
+            medical_diagnosis: medicalDiagnosis,
+            vital_signs_temperature: vitals?.temperature || null,
+            blood_preassure: vitals?.bloodPressure || null,
+            pulse_rate: vitals?.pulseRate || null,
+            blood_urine_alcohol_concentration_level: vitals?.bloodAlcohol || null,
+            rehabilitation_plan: rehabFinal,
+            details_of_treatment_provided: detailsOfTreatment,
+            attending_physicians_name_and_signature: attendingPhysician,
+            date_and_time: dateTime ? new Date(dateTime) : null,
+            files_of_treatment_provided: req.body.treatmentFilesJson || undefined,
+        };
+
+        // Human-readable labels for diffing
+        const fieldLabels = {
+            recurrent_injury_illness: 'Recurrent Injury/Illness',
+            date_and_time_treatment_provided: 'Date & Time Treatment Provided',
+            extent_of_disability: 'Extent of Disability',
+            nature_of_injury: 'Nature of Injury',
+            mechanism_of_injury: 'Mechanism of Injury',
+            contact_with_or_exposure_to: 'Contact With / Exposure To',
+            agency_of_injury: 'Agency of Injury',
+            parts_of_the_body_injured: 'Parts of Body Injured',
+            medical_diagnosis: 'Medical Diagnosis',
+            vital_signs_temperature: 'Temperature',
+            blood_preassure: 'Blood Pressure',
+            pulse_rate: 'Pulse Rate',
+            blood_urine_alcohol_concentration_level: 'Blood/Urine Alcohol Level',
+            rehabilitation_plan: 'Rehabilitation Plan',
+            details_of_treatment_provided: 'Details of Treatment',
+            attending_physicians_name_and_signature: 'Attending Physician',
+            date_and_time: 'Date/Time',
+        };
+
+        const existing = await knex('accident_section_three_master')
+            .where('accident_id', accident_id)
+            .first();
+
+        const changes_made = buildChangeLog({
+            user: created_by,
+            isCreate: !existing,
+            fieldLabels,
+            existing,
+            newPayload,
+        });
+
+        await knex.transaction(async (trx) => {
+            if (existing) {
+                await trx('accident_section_three_master')
+                    .where('accident_id', accident_id)
+                    .update({ ...newPayload, updated_by: created_by, updated_at: currentTimestamp });
+            } else {
+                await trx('accident_section_three_master')
+                    .insert({ accident_id, ...newPayload, created_by, created_at: currentTimestamp });
+            }
+
+            // ✅ Only log if there are actual changes
+            if (changes_made) {
+                await trx('accident_section_logs_master').insert({
+                    accident_id,
+                    changes_made,
+                    section: 'section_three',
+                    created_by,
+                    created_at: currentTimestamp,
+                });
+                console.log({
+                    accident_id,
+                    changes_made,
+                    section: 'section_three',
+                    created_by,
+                    created_at: currentTimestamp,
+                })
+            }
+        });
+
+
+
+        res.status(200).json({ message: 'Section 3 saved successfully.' });
+
+    } catch (err) {
+        console.log('UNABLE TO SAVE SECTION 3:', err);
+        res.status(500).json({ error: 'Failed to save Section 3.', details: err.message });
+    }
+});
+
+router.post('/add-section46-report', async (req, res) => {
+    try {
+        const currentTimestamp = new Date();
+        const { accident_id, injurySubType, illnesses, equipmentApplicable, equipmentName,
+            operatorName, equipmentId, damageCost, remarks, severity, likelihood, created_by } = req.body;
+
+        const LTA_VALUES = ['Fatal Accident', 'Non-Fatal Accident'];
+        const NON_LTA_VALUES = ['Minor Injury', 'First Aid Case'];
+        const lostTimeAccident = injurySubType.filter(v => LTA_VALUES.includes(v)).join(',');
+        const nonLostTimeAccident = injurySubType.filter(v => NON_LTA_VALUES.includes(v)).join(',');
+        const notApplicable = equipmentApplicable.includes('Not Applicable');
+
+        const newPayload = {
+            lost_time_accident: lostTimeAccident || null,
+            non_lost_time_accident: nonLostTimeAccident || null,
+            illnesses: illnesses.join(','),
+            equipment: equipmentApplicable.join(','),
+            equipment_id: notApplicable ? null : (equipmentId || null),
+            equipment_name: notApplicable ? null : (equipmentName || null),
+            damage_cost_php: notApplicable ? null : (damageCost || null),
+            operator_name: notApplicable ? null : (operatorName || null),
+            remarks: notApplicable ? null : (remarks || null),
+            severity,
+            likelihood,
+        };
+
+        const fieldLabels = {
+            lost_time_accident: 'Lost Time Accident',
+            non_lost_time_accident: 'Non-Lost Time Accident',
+            illnesses: 'Illnesses',
+            equipment: 'Equipment',
+            equipment_id: 'Equipment ID',
+            equipment_name: 'Equipment Name',
+            damage_cost_php: 'Damage Cost (PhP)',
+            operator_name: 'Operator Name',
+            remarks: 'Remarks',
+            severity: 'Severity',
+            likelihood: 'Likelihood',
+        };
+
+        const existing = await knex('accident_section_four_six_master')
+            .where('accident_id', accident_id)
+            .first();
+
+        const changes_made = buildChangeLog({
+            user: created_by,
+            isCreate: !existing,
+            fieldLabels,
+            existing,
+            newPayload,
+        });
+        await knex.transaction(async (trx) => {
+            if (existing) {
+                await trx('accident_section_four_six_master')
+                    .where('accident_id', accident_id)
+                    .update({ ...newPayload, updated_by: created_by, updated_at: currentTimestamp });
+            } else {
+                await trx('accident_section_four_six_master')
+                    .insert({ accident_id, ...newPayload, created_by, created_at: currentTimestamp });
+            }
+
+            if (changes_made) {
+                await trx('accident_section_logs_master').insert({
+                    accident_id,
+                    changes_made,
+                    section: 'section_four_six',
+                    created_by,
+                    created_at: currentTimestamp,
+                });
+            }
+        });
+
+        res.status(200).json({ message: 'Section 4-6 saved successfully.' });
+    } catch (err) {
+        console.log('UNABLE TO SAVE SECTION 4-6:', err);
+        res.status(500).json({ error: 'Failed to save Section 4-6.', details: err.message });
+    }
+});
+
+router.post('/add-section7-report', async (req, res) => {
+    try {
+        const currentTimestamp = new Date();
+        const { accident_id, teamLeader, startDate, closeOutDate, sequenceOfEvents,
+            factsAndFindings, personalFactors, personalFactorsOther, jobFactors, jobFactorsOther,
+            unsafeActs, unsafeActsSopOther, unsafeActsTrafficOther, unsafeActsOther,
+            unsafeConditions, unsafeConditionsOther, created_by } = req.body;
+
+        const personalFactorsFinal = [...personalFactors, ...(personalFactorsOther ? [personalFactorsOther] : [])].join(',');
+        const jobFactorsFinal = [...jobFactors, ...(jobFactorsOther ? [jobFactorsOther] : [])].join(',');
+        const unsafeActsFinal = [
+            ...unsafeActs,
+            ...(unsafeActsSopOther ? [`Not following SOP: ${unsafeActsSopOther}`] : []),
+            ...(unsafeActsTrafficOther ? [`Not following Traffic Rules: ${unsafeActsTrafficOther}`] : []),
+            ...(unsafeActsOther ? [unsafeActsOther] : []),
+        ].join(',');
+        const unsafeConditionsFinal = [...unsafeConditions, ...(unsafeConditionsOther ? [unsafeConditionsOther] : [])].join(',');
+
+        const newPayload = {
+            team_leader: teamLeader,
+            start_date: startDate || null,
+            close_out_date: closeOutDate || null,
+            sequence_of_events: sequenceOfEvents,
+            facts_and_findings: factsAndFindings,
+            personal_factors: personalFactorsFinal || null,
+            job_factors: jobFactorsFinal || null,
+            substandard_unsafe_acts: unsafeActsFinal || null,
+            substandard_unsafe_conditions: unsafeConditionsFinal || null,
+        };
+
+        const fieldLabels = {
+            team_leader: 'Team Leader',
+            start_date: 'Start Date',
+            close_out_date: 'Close Out Date',
+            sequence_of_events: 'Sequence of Events',
+            facts_and_findings: 'Facts and Findings',
+            personal_factors: 'Personal Factors',
+            job_factors: 'Job Factors',
+            substandard_unsafe_acts: 'Substandard/Unsafe Acts',
+            substandard_unsafe_conditions: 'Substandard/Unsafe Conditions',
+        };
+
+        const existing = await knex('accident_section_seven_master')
+            .where('accident_id', accident_id)
+            .first();
+
+        const changes_made = buildChangeLog({
+            user: created_by,
+            isCreate: !existing,
+            fieldLabels,
+            existing,
+            newPayload,
+        });
+
+        await knex.transaction(async (trx) => {
+            if (existing) {
+                await trx('accident_section_seven_master')
+                    .where('accident_id', accident_id)
+                    .update({ ...newPayload, updated_by: created_by, updated_at: currentTimestamp });
+            } else {
+                await trx('accident_section_seven_master')
+                    .insert({ accident_id, ...newPayload, created_by, created_at: currentTimestamp });
+            }
+
+            if (changes_made) {
+                await trx('accident_section_logs_master').insert({
+                    accident_id,
+                    changes_made,
+                    section: 'section_four_six',
+                    created_by,
+                    created_at: currentTimestamp,
+                });
+            }
+        });
+
+        res.status(200).json({ message: 'Section 7 saved successfully.' });
+    } catch (err) {
+        console.log('UNABLE TO SAVE SECTION 7:', err);
+        res.status(500).json({ error: 'Failed to save Section 7.', details: err.message });
+    }
+});
+
+router.post('/add-section8-report', async (req, res) => {
+    try {
+        const currentTimestamp = new Date();
+        const { accident_id, actionItems, additionalNotes, concernedDeptName, concernedDeptSignature,
+            concernedDeptDate, groupManagerName, groupManagerSignature, groupManagerDate,
+            safetyManagerName, safetyManagerSignature, safetyManagerDate,
+            dataManagement, created_by } = req.body;
+
+        const correctiveTable = actionItems
+            .filter(it => it.recommendation || it.responsibleDept || it.responsiblePerson || it.dueDate)
+            .map(it => ({
+                recommendation: it.recommendation,
+                responsible_department: it.responsibleDept,
+                responsible_person: it.responsiblePerson,
+                due_date: it.dueDate,
+                completion_responsible_person: it.completionResponsiblePerson,
+                dept_head: it.completionDeptHead,
+                status: it.status || 'Open',                    // ← add
+                proof_attachments: it.proofAttachments || [],    // ← add
+            }));
+
+        const formattedAttachments = attachments.map(option => ({ option, file_path: '' }));
+
+        const newPayload = {
+            corrective_table: JSON.stringify(correctiveTable),
+            concerned_department_name: concernedDeptName,
+            concerned_signature: concernedDeptSignature,
+            concerned_date: concernedDeptDate || null,
+            group_manager_name: groupManagerName,
+            group_manager_signature: groupManagerSignature,
+            group_manager_date: groupManagerDate || null,
+            safety_manager_name: safetyManagerName,
+            safety_manager_signature: safetyManagerSignature,
+            safety_manager_date: safetyManagerDate || null,
+            data_management: dataManagement.join(','),
+            other_attachements: JSON.stringify(formattedAttachments), // "[]"
+
+            additional_notes: additionalNotes,
+        };
+
+        const fieldLabels = {
+            corrective_table: 'Corrective Action Items',
+            concerned_department_name: 'Concerned Department Name',
+            concerned_signature: 'Concerned Department Signature',
+            concerned_date: 'Concerned Department Date',
+            group_manager_name: 'Group Manager Name',
+            group_manager_signature: 'Group Manager Signature',
+            group_manager_date: 'Group Manager Date',
+            safety_manager_name: 'Safety Manager Name',
+            safety_manager_signature: 'Safety Manager Signature',
+            safety_manager_date: 'Safety Manager Date',
+            data_management: 'Data Management',
+            // other_attachements removed — handled by upload/delete endpoints
+            additional_notes: 'Additional Notes',
+        };
+        const existing = await knex('accident_section_eight_master')
+            .where('accident_id', accident_id)
+            .first();
+
+        const changes_made = buildSectionEightChangeLog({
+            user: created_by,    // use updated_by in the update route
+            isCreate: !existing, // update route: isCreate: false
+            accident_id,
+            fieldLabels,
+            existing,
+            newPayload,
+        });
+
+        await knex.transaction(async (trx) => {
+            if (existing) {
+                await trx('accident_section_eight_master')
+                    .where('accident_id', accident_id)
+                    .update({ ...newPayload, updated_by: created_by, updated_at: currentTimestamp });
+            } else {
+                await trx('accident_section_eight_master')
+                    .insert({ accident_id, ...newPayload, created_by, created_at: currentTimestamp });
+            }
+
+            await trx('accident_section_logs_master').insert({
+                accident_id,
+                changes_made,
+                section: 'section_eight',
+                created_by,
+                created_at: currentTimestamp,
+            });
+        });
+
+        res.status(200).json({ message: 'Section 8 saved successfully.' });
+    } catch (err) {
+        console.log('UNABLE TO SAVE SECTION 8:', err);
+        res.status(500).json({ error: 'Failed to save Section 8.', details: err.message });
+    }
+});
+
+
+router.get('/get-all-report', async (req, res) => {
+    try {
+        const fetch = await knex('accident_master').select('*');
+        res.json(fetch);
+
+    } catch (err) {
+        console.log('UNABLE TO GET ALL REPORTS: ', err)
+    }
+})
+
+router.get('/get-section1-by-id', async (req, res) => {
+    try {
+        const getById = await SECTION1.findAll({
+            where: {
+                accident_id: req.query.accident_id
+            }
+        })
+        res.json(getById)
+    } catch (err) {
+        console.log('UNABLE TO GET REPORT BY ID: ', err)
+    }
+})
+
+// ── GET ROUTES ────────────────────────────────────────────────────────────────
+
+router.get('/get-section3-by-id', async (req, res) => {
+    try {
+        const data = await knex('accident_section_three_master')
+            .where('accident_id', req.query.accident_id)
+            .first();
+        res.json(data || null);
+    } catch (err) {
+        console.log('UNABLE TO GET SECTION 3:', err);
+        res.status(500).json({ error: 'Failed to get Section 3.', details: err.message });
+    }
+});
+
+router.get('/get-section46-by-id', async (req, res) => {
+    try {
+        const data = await knex('accident_section_four_six_master')
+            .where('accident_id', req.query.accident_id)
+            .first();
+        res.json(data || null);
+    } catch (err) {
+        console.log('UNABLE TO GET SECTION 4-6:', err);
+        res.status(500).json({ error: 'Failed to get Section 4-6.', details: err.message });
+    }
+});
+
+router.get('/get-section7-by-id', async (req, res) => {
+    try {
+        const data = await knex('accident_section_seven_master')
+            .where('accident_id', req.query.accident_id)
+            .first();
+        res.json(data || null);
+    } catch (err) {
+        console.log('UNABLE TO GET SECTION 7:', err);
+        res.status(500).json({ error: 'Failed to get Section 7.', details: err.message });
+    }
+});
+
+router.get('/get-section8-by-id', async (req, res) => {
+    try {
+        const data = await knex('accident_section_eight_master')
+            .where('accident_id', req.query.accident_id)
+            .first();
+        res.json(data || null);
+    } catch (err) {
+        console.log('UNABLE TO GET SECTION 8:', err);
+        res.status(500).json({ error: 'Failed to get Section 8.', details: err.message });
+    }
+});
+
+
+
+// ── UPDATE ROUTES ─────────────────────────────────────────────────────────────
+
+router.put('/update-section1-report', async (req, res) => {
+    try {
+        const currentTimestamp = new Date();
+        const {
+            accident_id,
+            goverment_notification_required,
+            data_for,
+            accident_incident_subtype,
+            employer,
+            name,
+            chapa_number,
+            job_designation,
+            date_of_event,
+            time_of_event,
+            shift,
+            date_reported,
+            time_reported,
+            location,
+            specific_location,
+            level,
+            reported_by,
+            supervisor_reported_to,
+            group,
+            department,
+            section,
+            date_hired,
+            date_of_birth,
+            age,
+            home_address,
+            status,
+            number_of_dependents,
+            length_of_service,
+            expereince_at_occupation,
+            workingAreas,
+            othersAreaChecked,
+            others_area,
+            incident_accident_brief_description,
+            immediate_actions_taken,
+            participants,
+            prepared_by,
+            date_and_time,
+            updated_by,
+        } = req.body;
+
+        const workingAreaFinal = [
+            ...(Array.isArray(workingAreas) ? workingAreas : []),
+            ...(othersAreaChecked && others_area ? [others_area] : [])
+        ].join(',');
+
+        const filteredParticipants = (participants || [])
+            .filter(p => p.name?.trim() || p.department?.trim() || p.involvementType?.trim())
+            .map(p => ({
+                name: p.name || '',
+                department: p.department || '',
+                involvementType: p.involvementType || '',
+            }));
+
+        const newPayload = {
+            goverment_notification_required: goverment_notification_required === 'YES' ? 1 : 0,
+            data_for,
+            accident_incident_subtype: Array.isArray(accident_incident_subtype)
+                ? accident_incident_subtype.join(',')
+                : accident_incident_subtype,
+            employer,
+            name,
+            chapa_number,
+            job_designation,
+            date_of_event,
+            time_of_event: parseTimeForSQL(time_of_event),
+            shift,
+            date_reported,
+            time_reported: parseTimeForSQL(time_reported),
+            location,
+            specific_location,
+            level,
+            reported_by,
+            supervisor_reported_to,
+            group,
+            department,
+            section,
+            date_hired,
+            date_of_birth,
+            age,
+            home_address,
+            status,
+            number_of_dependents,
+            length_of_service,
+            expereince_at_occupation,
+            working_area: workingAreaFinal,
+            incident_accident_brief_description,
+            immediate_actions_taken,
+            participants: JSON.stringify(filteredParticipants),
+            prepared_by,
+            date_and_time: date_and_time ? new Date(date_and_time) : null,
+        };
+
+        const fieldLabels = {
+            goverment_notification_required: 'Government Notification Required',
+            data_for: 'Data For',
+            accident_incident_subtype: 'Accident/Incident Subtype',
+            employer: 'Employer',
+            name: 'Name',
+            chapa_number: 'Chapa No.',
+            job_designation: 'Job Designation',
+            date_of_event: 'Date of Event',
+            time_of_event: 'Time of Event',
+            shift: 'Shift',
+            date_reported: 'Date Reported',
+            time_reported: 'Time Reported',
+            location: 'Location',
+            specific_location: 'Specific Location',
+            level: 'Level',
+            reported_by: 'Reported By',
+            supervisor_reported_to: 'Supervisor Reported To',
+            group: 'Group',
+            department: 'Department',
+            section: 'Section',
+            date_hired: 'Date Hired',
+            date_of_birth: 'Date of Birth',
+            age: 'Age',
+            home_address: 'Home Address',
+            status: 'Status',
+            number_of_dependents: 'No. of Dependents',
+            length_of_service: 'Length of Service',
+            expereince_at_occupation: 'Experience at Occupation',
+            working_area: 'Working Area',
+            incident_accident_brief_description: 'Incident/Accident Brief Description',
+            immediate_actions_taken: 'Immediate Actions Taken',
+            participants: 'Participants',
+            prepared_by: 'Prepared By',
+            date_and_time: 'Date & Time',
+        };
+
+        const existing = await knex('accident_section_one_master')
+            .where('accident_id', accident_id)
+            .first();
+
+        const changes_made = buildSectionOneChangeLog({
+            user: updated_by,
+            isCreate: false,
+            accident_id,
+            fieldLabels,
+            existing,
+            newPayload,
+        });
+
+        await knex.transaction(async (trx) => {
+            await trx('accident_section_one_master')
+                .where('accident_id', accident_id)
+                .update({
+                    ...newPayload,
+                    updated_by,
+                    updated_at: currentTimestamp,
+                });
+
+            await trx('accident_section_logs_master').insert({
+                accident_id,
+                changes_made,
+                section: 'section_one',
+                created_by: updated_by,
+                created_at: currentTimestamp,
+            });
+        });
+
+        res.status(200).json({ message: 'Section 1 updated successfully.' });
+
+    } catch (err) {
+        console.log('UNABLE TO UPDATE SECTION 1:', err);
+        res.status(500).json({ error: 'Failed to update Section 1.', details: err.message });
+    }
+});
+
+router.put('/update-section3-report', async (req, res) => {
+    try {
+        const currentTimestamp = new Date();
+        const {
+            accident_id,
+            recurrentInjury,
+            dateTimeProvided,
+            extentOfDisability,
+            natureOfInjury,
+            mechanismOfInjury,
+            mechanismOfInjuryOther,
+            contactExposure,
+            contactExposureOther,
+            agencyOfInjury,
+            agencyOfInjuryOther,
+            partsBodyInjured,
+            partsBodyInjuredOther,
+            medicalDiagnosis,
+            vitals,
+            rehabilitationPlan,
+            rehabLightWorkDays,
+            rehabFurtherEval,
+            detailsOfTreatment,
+            attendingPhysician,
+            dateTime,
+            updated_by,
+        } = req.body;
+
+        const mechanismFinal = [
+            ...mechanismOfInjury,
+            ...(mechanismOfInjuryOther ? [mechanismOfInjuryOther] : [])
+        ].join(',');
+
+        const contactFinal = [
+            ...contactExposure,
+            ...(contactExposureOther ? [contactExposureOther] : [])
+        ].join(',');
+
+        const agencyFinal = [
+            ...agencyOfInjury,
+            ...(agencyOfInjuryOther ? [agencyOfInjuryOther] : [])
+        ].join(',');
+
+        const bodyPartsFinal = [
+            ...partsBodyInjured,
+            ...(partsBodyInjuredOther ? [partsBodyInjuredOther] : [])
+        ].join(',');
+
+        const rehabFinal = [
+            ...rehabilitationPlan,
+            ...(rehabLightWorkDays ? [`Light Work: ${rehabLightWorkDays} days`] : []),
+            ...(rehabFurtherEval ? [`Further Evaluation: ${rehabFurtherEval}`] : [])
+        ].join(',');
+
+        const newPayload = {
+            recurrent_injury_illness: recurrentInjury === 'YES' ? 1 : 0,
+            date_and_time_treatment_provided: dateTimeProvided,
+            extent_of_disability: extentOfDisability.join(','),
+            nature_of_injury: natureOfInjury.join(','),
+            mechanism_of_injury: mechanismFinal,
+            contact_with_or_exposure_to: contactFinal,
+            agency_of_injury: agencyFinal,
+            parts_of_the_body_injured: bodyPartsFinal,
+            medical_diagnosis: medicalDiagnosis,
+            vital_signs_temperature: vitals?.temperature || null,
+            blood_preassure: vitals?.bloodPressure || null,
+            pulse_rate: vitals?.pulseRate || null,
+            blood_urine_alcohol_concentration_level: vitals?.bloodAlcohol || null,
+            rehabilitation_plan: rehabFinal,
+            details_of_treatment_provided: detailsOfTreatment,
+            attending_physicians_name_and_signature: attendingPhysician,
+            date_and_time: dateTime ? new Date(dateTime) : null,
+            files_of_treatment_provided: req.body.treatmentFilesJson || undefined,
+        };
+
+        // Fetch existing row to diff against
+        const existing = await knex('accident_section_three_master')
+            .where('accident_id', accident_id)
+            .first();
+
+        // Human-readable labels for each DB column
+        const fieldLabels = {
+            recurrent_injury_illness: 'Recurrent Injury/Illness',
+            date_and_time_treatment_provided: 'Date & Time Treatment Provided',
+            extent_of_disability: 'Extent of Disability',
+            nature_of_injury: 'Nature of Injury',
+            mechanism_of_injury: 'Mechanism of Injury',
+            contact_with_or_exposure_to: 'Contact With / Exposure To',
+            agency_of_injury: 'Agency of Injury',
+            parts_of_the_body_injured: 'Parts of Body Injured',
+            medical_diagnosis: 'Medical Diagnosis',
+            vital_signs_temperature: 'Temperature',
+            blood_preassure: 'Blood Pressure',
+            pulse_rate: 'Pulse Rate',
+            blood_urine_alcohol_concentration_level: 'Blood/Urine Alcohol Level',
+            rehabilitation_plan: 'Rehabilitation Plan',
+            details_of_treatment_provided: 'Details of Treatment',
+            attending_physicians_name_and_signature: 'Attending Physician',
+            date_and_time: 'Date/Time',
+        };
+
+        const changes_made = buildChangeLog({
+            user: updated_by,
+            isCreate: false,
+            fieldLabels,
+            existing,
+            newPayload,
+        });
+
+        await knex.transaction(async (trx) => {
+            await trx('accident_section_three_master')
+                .where('accident_id', accident_id)
+                .update({
+                    ...newPayload,
+                    updated_by,
+                    updated_at: currentTimestamp,
+                });
+
+            if (changes_made) {
+                await trx('accident_section_logs_master').insert({
+                    accident_id,
+                    changes_made,
+                    section: 'section_four_six',
+                    created_by: updated_by,
+                    created_at: currentTimestamp,
+                });
+            }
+        });
+
+        res.status(200).json({ message: 'Section 3 updated successfully.' });
+
+    } catch (err) {
+        console.log('UNABLE TO UPDATE SECTION 3:', err);
+        res.status(500).json({ error: 'Failed to update Section 3.', details: err.message });
+    }
+});
+
+router.put('/update-section46-report', async (req, res) => {
+    try {
+        const currentTimestamp = new Date();
+        const {
+            accident_id,
+            injurySubType,
+            illnesses,
+            equipmentApplicable,
+            equipmentName,
+            operatorName,
+            equipmentId,
+            damageCost,
+            remarks,
+            severity,
+            likelihood,
+            updated_by,
+        } = req.body;
+
+        const LTA_VALUES = ['Fatal Accident', 'Non-Fatal Accident'];
+        const NON_LTA_VALUES = ['Minor Injury', 'First Aid Case'];
+
+        const lostTimeAccident = injurySubType.filter(v => LTA_VALUES.includes(v)).join(',');
+        const nonLostTimeAccident = injurySubType.filter(v => NON_LTA_VALUES.includes(v)).join(',');
+        const notApplicable = equipmentApplicable.includes('Not Applicable');
+
+        const newPayload = {
+            lost_time_accident: lostTimeAccident || null,
+            non_lost_time_accident: nonLostTimeAccident || null,
+            illnesses: illnesses.join(','),
+            equipment: equipmentApplicable.join(','),
+            equipment_id: notApplicable ? null : (equipmentId || null),
+            equipment_name: notApplicable ? null : (equipmentName || null),
+            damage_cost_php: notApplicable ? null : (damageCost || null),
+            operator_name: notApplicable ? null : (operatorName || null),
+            remarks: notApplicable ? null : (remarks || null),
+            severity,
+            likelihood,
+        };
+
+        const fieldLabels = {
+            lost_time_accident: 'Lost Time Accident',
+            non_lost_time_accident: 'Non-Lost Time Accident',
+            illnesses: 'Illnesses',
+            equipment: 'Equipment',
+            equipment_id: 'Equipment ID',
+            equipment_name: 'Equipment Name',
+            damage_cost_php: 'Damage Cost (PhP)',
+            operator_name: 'Operator Name',
+            remarks: 'Remarks',
+            severity: 'Severity',
+            likelihood: 'Likelihood',
+        };
+
+        const existing = await knex('accident_section_four_six_master')
+            .where('accident_id', accident_id)
+            .first();
+
+        const changes_made = buildChangeLog({
+            user: updated_by,
+            isCreate: false,
+            fieldLabels,
+            existing,
+            newPayload,
+        });
+
+        await knex.transaction(async (trx) => {
+            await trx('accident_section_four_six_master')
+                .where('accident_id', accident_id)
+                .update({
+                    ...newPayload,
+                    updated_by,
+                    updated_at: currentTimestamp,
+                });
+
+            if (changes_made) {
+                await trx('accident_section_logs_master').insert({
+                    accident_id,
+                    changes_made,
+                    section: 'section_four_six',
+                    created_by: updated_by,
+                    created_at: currentTimestamp,
+                });
+            }
+        });
+
+        res.status(200).json({ message: 'Section 4-6 updated successfully.' });
+
+    } catch (err) {
+        console.log('UNABLE TO UPDATE SECTION 4-6:', err);
+        res.status(500).json({ error: 'Failed to update Section 4-6.', details: err.message });
+    }
+});
+
+router.put('/update-section7-report', async (req, res) => {
+    try {
+        const currentTimestamp = new Date();
+        const { accident_id, teamLeader, startDate, closeOutDate, sequenceOfEvents,
+            factsAndFindings, personalFactors, personalFactorsOther, jobFactors, jobFactorsOther,
+            unsafeActs, unsafeActsSopOther, unsafeActsTrafficOther, unsafeActsOther,
+            unsafeConditions, unsafeConditionsOther, updated_by } = req.body;
+
+        const personalFactorsFinal = [...personalFactors, ...(personalFactorsOther ? [personalFactorsOther] : [])].join(',');
+        const jobFactorsFinal = [...jobFactors, ...(jobFactorsOther ? [jobFactorsOther] : [])].join(',');
+        const unsafeActsFinal = [
+            ...unsafeActs,
+            ...(unsafeActsSopOther ? [`Not following SOP: ${unsafeActsSopOther}`] : []),
+            ...(unsafeActsTrafficOther ? [`Not following Traffic Rules: ${unsafeActsTrafficOther}`] : []),
+            ...(unsafeActsOther ? [unsafeActsOther] : []),
+        ].join(',');
+        const unsafeConditionsFinal = [...unsafeConditions, ...(unsafeConditionsOther ? [unsafeConditionsOther] : [])].join(',');
+
+        const newPayload = {
+            team_leader: teamLeader,
+            start_date: startDate || null,
+            close_out_date: closeOutDate || null,
+            sequence_of_events: sequenceOfEvents,
+            facts_and_findings: factsAndFindings,
+            personal_factors: personalFactorsFinal || null,
+            job_factors: jobFactorsFinal || null,
+            substandard_unsafe_acts: unsafeActsFinal || null,
+            substandard_unsafe_conditions: unsafeConditionsFinal || null,
+        };
+
+        const fieldLabels = {
+            team_leader: 'Team Leader',
+            start_date: 'Start Date',
+            close_out_date: 'Close Out Date',
+            sequence_of_events: 'Sequence of Events',
+            facts_and_findings: 'Facts and Findings',
+            personal_factors: 'Personal Factors',
+            job_factors: 'Job Factors',
+            substandard_unsafe_acts: 'Substandard/Unsafe Acts',
+            substandard_unsafe_conditions: 'Substandard/Unsafe Conditions',
+        };
+
+        const existing = await knex('accident_section_seven_master')
+            .where('accident_id', accident_id)
+            .first();
+
+        const changes_made = buildChangeLog({
+            user: updated_by,
+            isCreate: false,
+            fieldLabels,
+            existing,
+            newPayload,
+        });
+
+        await knex.transaction(async (trx) => {
+            await trx('accident_section_seven_master')
+                .where('accident_id', accident_id)
+                .update({ ...newPayload, updated_by, updated_at: currentTimestamp });
+
+            if (changes_made) {
+                await trx('accident_section_logs_master').insert({
+                    accident_id,
+                    changes_made,
+                    section: 'section_four_six',
+                    created_by: updated_by,
+                    created_at: currentTimestamp,
+                });
+            }
+        });
+
+        res.status(200).json({ message: 'Section 7 updated successfully.' });
+    } catch (err) {
+        console.log('UNABLE TO UPDATE SECTION 7:', err);
+        res.status(500).json({ error: 'Failed to update Section 7.', details: err.message });
+    }
+});
+
+router.put('/update-section8-report', async (req, res) => {
+    try {
+        const currentTimestamp = new Date();
+        const { accident_id, actionItems, additionalNotes, concernedDeptName, concernedDeptSignature,
+            concernedDeptDate, groupManagerName, groupManagerSignature, groupManagerDate,
+            safetyManagerName, safetyManagerSignature, safetyManagerDate,
+            dataManagement, attachments, updated_by } = req.body;
+
+        const correctiveTable = actionItems
+            .filter(it => it.recommendation || it.responsibleDept || it.responsiblePerson || it.dueDate)
+            .map(it => ({
+                recommendation: it.recommendation,
+                responsible_department: it.responsibleDept,
+                responsible_person: it.responsiblePerson,
+                due_date: it.dueDate,
+                completion_responsible_person: it.completionResponsiblePerson,
+                dept_head: it.completionDeptHead,
+                status: it.status || 'Open',                    // ← add
+                proof_attachments: it.proofAttachments || [],    // ← add
+            }));
+
+        // const formattedAttachments = attachments.map(option => ({ option, file_path: '' }));
+
+        const newPayload = {
+            corrective_table: JSON.stringify(correctiveTable),
+            concerned_department_name: concernedDeptName,
+            concerned_signature: concernedDeptSignature,
+            concerned_date: concernedDeptDate || null,
+            group_manager_name: groupManagerName,
+            group_manager_signature: groupManagerSignature,
+            group_manager_date: groupManagerDate || null,
+            safety_manager_name: safetyManagerName,
+            safety_manager_signature: safetyManagerSignature,
+            safety_manager_date: safetyManagerDate || null,
+            data_management: dataManagement.join(','),
+            attachment_checklist: Array.isArray(attachments) ? attachments.join(',') : '',  // ← NEW
+            // other_attachements intentionally omitted
+            additional_notes: additionalNotes,
+        };
+
+        const fieldLabels = {
+            corrective_table: 'Corrective Action Items',
+            concerned_department_name: 'Concerned Department Name',
+            concerned_signature: 'Concerned Department Signature',
+            concerned_date: 'Concerned Department Date',
+            group_manager_name: 'Group Manager Name',
+            group_manager_signature: 'Group Manager Signature',
+            group_manager_date: 'Group Manager Date',
+            safety_manager_name: 'Safety Manager Name',
+            safety_manager_signature: 'Safety Manager Signature',
+            safety_manager_date: 'Safety Manager Date',
+            data_management: 'Data Management',
+            attachment_checklist: 'Attachment Checklist',  // ← NEW
+            additional_notes: 'Additional Notes',
+        };
+
+        const existing = await knex('accident_section_eight_master')
+            .where('accident_id', accident_id)
+            .first();
+
+        const changes_made = buildSectionEightChangeLog({
+            user: updated_by,    // use updated_by in the update route
+            isCreate: !existing, // update route: isCreate: false
+            accident_id,
+            fieldLabels,
+            existing,
+            newPayload,
+        });
+
+        await knex.transaction(async (trx) => {
+            await trx('accident_section_eight_master')
+                .where('accident_id', accident_id)
+                .update({ ...newPayload, updated_by, updated_at: currentTimestamp });
+
+            await trx('accident_section_logs_master').insert({
+                accident_id,
+                changes_made,
+                section: 'section_eight',
+                created_by: updated_by,
+                created_at: currentTimestamp,
+            });
+        });
+
+        res.status(200).json({ message: 'Section 8 updated successfully.' });
+    } catch (err) {
+        console.log('UNABLE TO UPDATE SECTION 8:', err);
+        res.status(500).json({ error: 'Failed to update Section 8.', details: err.message });
+    }
+});
+
+
+module.exports = router;

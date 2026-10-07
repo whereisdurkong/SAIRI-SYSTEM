@@ -1,0 +1,371 @@
+
+// import { useState } from "react";
+// import { NavLink as NavLinkRRD, Link } from "react-router-dom";
+// import { PropTypes } from "prop-types";
+
+// import {
+//   Collapse,
+//   NavbarBrand,
+//   Navbar,
+//   NavItem,
+//   NavLink,
+//   Nav,
+//   Container,
+//   Row,
+//   Col,
+// } from "reactstrap";
+
+// var ps;
+
+// const Sidebar = (props) => {
+//   const [collapseOpen, setCollapseOpen] = useState();
+
+//   const activeRoute = (routeName) => {
+//     return props.location.pathname.indexOf(routeName) > -1 ? "active" : "";
+//   };
+
+//   const toggleCollapse = () => {
+//     setCollapseOpen((data) => !data);
+//   };
+
+//   const closeCollapse = () => {
+//     setCollapseOpen(false);
+//   };
+
+//   const createLinks = (routes) => {
+//     return routes.map((prop, key) => {
+//       return (
+//         <NavItem key={key}>
+//           <NavLink
+//             to={prop.layout + prop.path}
+//             tag={NavLinkRRD}
+//             onClick={closeCollapse}
+//           >
+//             <i className={prop.icon} />
+//             {prop.name}
+//           </NavLink>
+//         </NavItem>
+//       );
+//     });
+//   };
+
+
+//   const { bgColor, routes, logo } = props;
+//   let navbarBrandProps;
+//   if (logo && logo.innerLink) {
+//     navbarBrandProps = {
+//       to: logo.innerLink,
+//       tag: Link,
+//     };
+//   } else if (logo && logo.outterLink) {
+//     navbarBrandProps = {
+//       href: logo.outterLink,
+//       target: "_blank",
+//     };
+//   }
+
+//   const handleLogout = () => {
+//     localStorage.removeItem("user");
+//     window.location.replace("/");
+//   };
+
+//   return (
+//     <Navbar
+//       className="navbar-vertical fixed-left navbar-light bg-white"
+//       expand="md"
+//       id="sidenav-main"
+//     >
+//       <Container fluid>
+//         {/* Toggler */}
+//         <button
+//           className="navbar-toggler"
+//           type="button"
+//           onClick={toggleCollapse}
+//         >
+//           <span className="navbar-toggler-icon" />
+//         </button>
+
+//         {/* Brand - centered on mobile, left-aligned on md+ */}
+//         {logo ? (
+//           <NavbarBrand className="pt-10 mx-auto mx-md-0" {...navbarBrandProps}>
+//             <img
+//               alt={logo.imgAlt}
+//               className="navbar-brand-img"
+//               src={logo.imgSrc}
+//             />
+//           </NavbarBrand>
+//         ) : null}
+
+//         {/* Collapse */}
+//         <Collapse navbar isOpen={collapseOpen}>
+//           {/* Collapse header */}
+//           <div className="navbar-collapse-header d-md-none">
+//             <Row>
+//               {logo ? (
+//                 <Col className="collapse-brand" xs="6">
+//                   {logo.innerLink ? (
+//                     <Link to={logo.innerLink}>
+//                       <img alt={logo.imgAlt} src={logo.imgSrc} />
+//                     </Link>
+//                   ) : (
+//                     <a href={logo.outterLink}>
+//                       <img alt={logo.imgAlt} src={logo.imgSrc} />
+//                     </a>
+//                   )}
+//                 </Col>
+//               ) : null}
+//               <Col className="collapse-close" xs="6">
+//                 <button
+//                   className="navbar-toggler"
+//                   type="button"
+//                   onClick={toggleCollapse}
+//                 >
+//                   <span />
+//                   <span />
+//                 </button>
+//               </Col>
+//             </Row>
+//           </div>
+
+//           {/* Navigation */}
+//           <Nav navbar>{createLinks(routes)}</Nav>
+
+//           {/* Divider */}
+//           <hr className="my-3" />
+
+//           {/* Heading */}
+//           <h6 className="navbar-heading text-muted">ADMIN</h6>
+
+//           {/* Navigation */}
+//           <Nav navbar>{createLinks(routes)}</Nav>
+
+
+
+//         </Collapse>
+//       </Container>
+//     </Navbar>
+//   );
+// };
+
+// Sidebar.defaultProps = {
+//   routes: [{}],
+// };
+
+// Sidebar.propTypes = {
+//   routes: PropTypes.arrayOf(PropTypes.object),
+//   logo: PropTypes.shape({
+//     innerLink: PropTypes.string,
+//     outterLink: PropTypes.string,
+//     imgSrc: PropTypes.string.isRequired,
+//     imgAlt: PropTypes.string.isRequired,
+//   }),
+// };
+
+// export default Sidebar;
+
+
+
+import { useState } from "react";
+import { NavLink as NavLinkRRD, Link } from "react-router-dom";
+import { PropTypes } from "prop-types";
+
+import {
+  Collapse,
+  NavbarBrand,
+  Navbar,
+  NavItem,
+  NavLink,
+  Nav,
+  Container,
+  Row,
+  Col,
+} from "reactstrap";
+
+var ps;
+
+const Sidebar = (props) => {
+  const [collapseOpen, setCollapseOpen] = useState();
+
+  const activeRoute = (routeName) => {
+    return props.location.pathname.indexOf(routeName) > -1 ? "active" : "";
+  };
+
+  const toggleCollapse = () => {
+    setCollapseOpen((data) => !data);
+  };
+
+  const closeCollapse = () => {
+    setCollapseOpen(false);
+  };
+
+  const createLinks = (routes) => {
+    return routes
+      .filter((prop) => prop.showInNav !== false)
+      .map((prop, key) => {
+        const IconComponent = prop.icon;
+        return (
+          <NavItem key={key}>
+            <NavLink
+              to={prop.layout + prop.path}
+              tag={NavLinkRRD}
+              onClick={closeCollapse}
+            >
+              {IconComponent && (
+                <IconComponent
+                  size={18}
+                  color={prop.color || "#8898aa"}  // 👈 fallback color
+                  className="mr-2"
+                />
+              )}
+              {prop.name}
+            </NavLink>
+          </NavItem>
+        );
+      });
+  };
+
+
+  const { bgColor, routes, logo } = props;
+
+  // Split routes into general nav items vs admin-management items
+  // const generalRoutes = routes.filter((r) => r.section !== "admin");
+  const dashboardAdminRoutes = routes.filter((r) => r.section === "dashboard");
+  const adminRoutes = routes.filter((r) => r.section === "admin");
+  const toolsRoutes = routes.filter((r) => r.section === "tools");
+  const ProfileRoutes = routes.filter((r) => r.section === "profile");
+
+  console.log("adminRoutes:", adminRoutes);
+
+  let navbarBrandProps;
+  if (logo && logo.innerLink) {
+    navbarBrandProps = {
+      to: logo.innerLink,
+      tag: Link,
+    };
+  } else if (logo && logo.outterLink) {
+    navbarBrandProps = {
+      href: logo.outterLink,
+      target: "_blank",
+    };
+  }
+
+  const handleLogout = () => {
+    localStorage.removeItem("user");
+    window.location.replace("/");
+  };
+
+  return (
+    <Navbar
+      className="navbar-vertical fixed-left navbar-light bg-white"
+      expand="md"
+      id="sidenav-main"
+    >
+      <Container fluid>
+        {/* Toggler */}
+        <button
+          className="navbar-toggler"
+          type="button"
+          onClick={toggleCollapse}
+        >
+          <span className="navbar-toggler-icon" />
+        </button>
+
+        {/* Brand - centered on mobile, left-aligned on md+ */}
+        {logo ? (
+          <NavbarBrand className="pt-10 mx-auto mx-md-0" {...navbarBrandProps}>
+            <img
+              alt={logo.imgAlt}
+              className="navbar-brand-img"
+              src={logo.imgSrc}
+            />
+          </NavbarBrand>
+        ) : null}
+
+        {/* Collapse */}
+        <Collapse navbar isOpen={collapseOpen}>
+          {/* Collapse header */}
+          <div className="navbar-collapse-header d-md-none">
+            <Row>
+              {logo ? (
+                <Col className="collapse-brand" xs="6">
+                  {logo.innerLink ? (
+                    <Link to={logo.innerLink}>
+                      <img alt={logo.imgAlt} src={logo.imgSrc} />
+                    </Link>
+                  ) : (
+                    <a href={logo.outterLink}>
+                      <img alt={logo.imgAlt} src={logo.imgSrc} />
+                    </a>
+                  )}
+                </Col>
+              ) : null}
+              <Col className="collapse-close" xs="6">
+                <button
+                  className="navbar-toggler"
+                  type="button"
+                  onClick={toggleCollapse}
+                >
+                  <span />
+                  <span />
+                </button>
+              </Col>
+            </Row>
+          </div>
+
+          {/* General navigation */}
+
+          {dashboardAdminRoutes.length > 0 && (
+            <>
+
+              <Nav navbar>{createLinks(dashboardAdminRoutes)}</Nav>
+            </>
+          )}
+
+          {toolsRoutes.length > 0 && (
+            <>
+              <hr className="my-3" />
+              <h6 className="navbar-heading " style={{ color: '#145700', fontWeight: 'bold' }}>Tools</h6>
+              <Nav navbar>{createLinks(toolsRoutes)}</Nav>
+            </>
+          )}
+
+          {/* Admin section — only show if there are admin routes to display */}
+          {adminRoutes.length > 0 && (
+            <>
+              <hr className="my-3" />
+              <h6 className="navbar-heading" style={{ color: '#145700', fontWeight: 'bold' }}>ADMIN</h6>
+              <Nav navbar>{createLinks(adminRoutes)}</Nav>
+            </>
+          )}
+
+          {/* Admin section — only show if there are admin routes to display */}
+          {ProfileRoutes.length > 0 && (
+            <>
+              <hr className="my-3" />
+              <h6 className="navbar-heading" style={{ color: '#145700', fontWeight: 'bold' }}>PROFILE</h6>
+              <Nav navbar>{createLinks(ProfileRoutes)}</Nav>
+            </>
+          )}
+
+
+        </Collapse>
+      </Container>
+    </Navbar>
+  );
+};
+
+Sidebar.defaultProps = {
+  routes: [{}],
+};
+
+Sidebar.propTypes = {
+  routes: PropTypes.arrayOf(PropTypes.object),
+  logo: PropTypes.shape({
+    innerLink: PropTypes.string,
+    outterLink: PropTypes.string,
+    imgSrc: PropTypes.string.isRequired,
+    imgAlt: PropTypes.string.isRequired,
+  }),
+};
+
+export default Sidebar;
